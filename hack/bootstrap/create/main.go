@@ -15,14 +15,14 @@ import (
 
 var preloadImagesList = []struct{ name, image, version string }{
 	{"mongo", "mongo", "latest"},
-	{"rbac", "gcr.io/kubebuilder/kube-rbac-proxy", "v0.8.0"},
-	{"redis", "k8s.gcr.io/redis", "e2e"},
-	{"httpbin", "docker.io/kennethreitz/httpbin", ""},
-	{"gateway", "tykio/tyk-gateway", "v3.1.2"},
+	{"rbac", "gcr.io/kubebuilder/kube-rbac-proxy", "v0.8.0-arm64"},
+	{"redis", "redis", "6.0.10"},
+	{"httpbin", "arnaudlacour/httpbin", ""},
+	{"gateway", "tykio/tyk-gateway", "v4.0rc15"},
 	{"dash", "tykio/tyk-dashboard", "v3.2.1"},
 	{"bash", "bash", "5.1"},
 	{"busybox", "busybox", "1.32"},
-	{"grpc", "mangomm/tyk-grpc-plugin", ""},
+	{"grpc", "buraksekili/tyk-grpc-plugin-arm64", ""},
 	{"cert-manager-cainjector", "quay.io/jetstack/cert-manager-cainjector", "v1.3.1"},
 	{"cert-manager-controller", "quay.io/jetstack/cert-manager-controller", "v1.3.1"},
 	{"cert-manager-webhook", "quay.io/jetstack/cert-manager-webhook", "v1.3.1"},
@@ -495,7 +495,7 @@ func loadImage(name, image, version string) {
 		}
 	}
 	{
-		cmd := exec.Command("kind", "load", "docker-image", img, "--name", *cluster)
+		cmd := exec.Command("kind", "-v", "1000", "load", "docker-image", img, "--name", *cluster)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stdout
 		if err := cmd.Run(); err != nil {
