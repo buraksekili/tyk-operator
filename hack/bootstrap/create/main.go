@@ -15,7 +15,7 @@ import (
 
 var preloadImagesList = []struct{ name, image, version string }{
 	{"mongo", "mongo", "latest"},
-	{"rbac", "gcr.io/kubebuilder/kube-rbac-proxy", "v0.8.0-arm64"},
+	{"rbac", "gcr.io/kubebuilder/kube-rbac-proxy", "v0.8.0"},
 	{"redis", "redis", "6.0.10"},
 	{"httpbin", "arnaudlacour/httpbin", ""},
 	{"gateway", "tykio/tyk-gateway", "v4.0rc15"},
