@@ -29,7 +29,7 @@ spec:
         version: v1
     spec:
       containers:
-        - image: docker.io/kennethreitz/httpbin
+        - image: docker.io/buraksekili/httpbin
           imagePullPolicy: IfNotPresent
           name: httpbin
           ports:

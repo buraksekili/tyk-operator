@@ -30,7 +30,7 @@ spec:
     spec:
       containers:
         - name: tyk-grpc-plugin
-          image: mangomm/tyk-grpc-plugin:latest
+          image: buraksekili/tyk-grpc-plugin:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 9999

@@ -10,23 +10,36 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
-var preloadImagesList = []struct{ name, image, version string }{
-	{"mongo", "mongo", "latest"},
-	{"rbac", "gcr.io/kubebuilder/kube-rbac-proxy", "v0.8.0"},
-	{"redis", "k8s.gcr.io/redis", "e2e"},
-	{"httpbin", "docker.io/kennethreitz/httpbin", ""},
-	{"gateway", "tykio/tyk-gateway", "v3.1.2"},
-	{"dash", "tykio/tyk-dashboard", "v3.2.1"},
-	{"bash", "bash", "5.1"},
-	{"busybox", "busybox", "1.32"},
-	{"grpc", "mangomm/tyk-grpc-plugin", ""},
-	{"cert-manager-cainjector", "quay.io/jetstack/cert-manager-cainjector", "v1.3.1"},
-	{"cert-manager-controller", "quay.io/jetstack/cert-manager-controller", "v1.3.1"},
-	{"cert-manager-webhook", "quay.io/jetstack/cert-manager-webhook", "v1.3.1"},
+type Image struct{ name, image, version string }
+
+func createPreloadImagesList() []Image {
+
+	kubeRBACProxyVersion := "v0.8.0"
+	if GOARCH := runtime.GOARCH; GOARCH == "arm64" {
+		kubeRBACProxyVersion = fmt.Sprintf("%s-arm64", kubeRBACProxyVersion)
+	}
+
+	return []Image{
+		{"mongo", "mongo", "latest"},
+		{"rbac", "gcr.io/kubebuilder/kube-rbac-proxy", kubeRBACProxyVersion},
+		{"redis", "redis", "6.0.10"},
+		{"httpbin", "docker.io/buraksekili/httpbin", ""},
+		{"gateway", "tykio/tyk-gateway", "v4.0rc15"},
+		{"dash", "tykio/tyk-dashboard", "v3.2.1"},
+		{"bash", "bash", "5.1"},
+		{"busybox", "busybox", "1.32"},
+		{"grpc", "docker.io/buraksekili/tyk-grpc-plugin", ""},
+		{"cert-manager-cainjector", "quay.io/jetstack/cert-manager-cainjector", "v1.3.1"},
+		{"cert-manager-controller", "quay.io/jetstack/cert-manager-controller", "v1.3.1"},
+		{"cert-manager-webhook", "quay.io/jetstack/cert-manager-webhook", "v1.3.1"},
+	}
 }
+
+var preloadImagesList = createPreloadImagesList()
 
 // Config configuration for booting operator environment
 type Config struct {
