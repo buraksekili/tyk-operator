@@ -144,7 +144,7 @@ bundle-build:	## Build the bundle image.
 
 .PHONY: cross-build-image
 cross-build-image: ## Build docker image
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GO111MODULE=on go build -a -o manager.linux main.go
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o manager.linux main.go
 	docker build -f cross.Dockerfile . -t ${IMG}
 
 .PHONY: install-cert-manager

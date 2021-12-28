@@ -22,7 +22,7 @@ var preloadImagesList = []struct{ name, image, version string }{
 	{"dash", "tykio/tyk-dashboard", "v3.2.1"},
 	{"bash", "bash", "5.1"},
 	{"busybox", "busybox", "1.32"},
-	{"grpc", "buraksekili/tyk-grpc-plugin-arm64", ""},
+	{"grpc", "buraksekili/tyk-grpc-plugin", ""},
 	{"cert-manager-cainjector", "quay.io/jetstack/cert-manager-cainjector", "v1.3.1"},
 	{"cert-manager-controller", "quay.io/jetstack/cert-manager-controller", "v1.3.1"},
 	{"cert-manager-webhook", "quay.io/jetstack/cert-manager-webhook", "v1.3.1"},
