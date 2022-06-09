@@ -113,24 +113,47 @@ func (r *ApiDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	var queueA time.Duration
 
-	_, err = util.CreateOrUpdate(ctx, r.Client, desired, func() error {
-		if !desired.ObjectMeta.DeletionTimestamp.IsZero() {
-			e, err := r.delete(ctx, desired)
+	_, err = util.CreateOrUpdate(ctx, r.Client, upstreamRequestStruct, func() error {
+		if !upstreamRequestStruct.ObjectMeta.DeletionTimestamp.IsZero() {
+
+			if upstreamRequestStruct.Status.SubgraphID != "" {
+				subgraph := &tykv1alpha1.SubGraph{}
+				err := r.Client.Get(ctx, types.NamespacedName{
+					Namespace: req.Namespace,
+					Name:      upstreamRequestStruct.Status.SubgraphID,
+				}, subgraph)
+				if err != nil {
+					log.Error(err, fmt.Sprintf(
+						"failed to get SubGraph %s, skipping SubGraph Status update",
+						upstreamRequestStruct.Status.SubgraphID,
+					))
+				} else {
+					subgraph.Status.APIID = ""
+					err = r.Status().Update(ctx, subgraph)
+					if err != nil {
+						log.Error(err, fmt.Sprintf(
+							"Could not update status.api_id of SubGraph %s/%s", subgraph.Namespace, subgraph.Name),
+						)
+					}
+				}
+			}
+
+			e, err := r.delete(ctx, upstreamRequestStruct)
 			queueA = e
 			return err
 		}
 
-		if desired.Spec.APIID == "" {
+		if upstreamRequestStruct.Spec.APIID == "" {
 			upstreamRequestStruct.Spec.APIID = encodeNS(req.NamespacedName.String())
 		}
 
-		if desired.Spec.OrgID == "" {
+		if upstreamRequestStruct.Spec.OrgID == "" {
 			upstreamRequestStruct.Spec.OrgID = env.Org
 		}
 
-		util.AddFinalizer(desired, keys.ApiDefFinalizerName)
+		util.AddFinalizer(upstreamRequestStruct, keys.ApiDefFinalizerName)
 
-		if len(desired.Spec.UpstreamCertificateRefs) != 0 {
+		if len(upstreamRequestStruct.Spec.UpstreamCertificateRefs) != 0 {
 			for domain, certName := range desired.Spec.UpstreamCertificateRefs {
 				tykCertID, err := r.checkSecretAndUpload(ctx, certName, namespacedName.Namespace, log, &env)
 				if err != nil {
@@ -147,8 +170,8 @@ func (r *ApiDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		upstreamRequestStruct.Spec.UpstreamCertificateRefs = nil
 
 		// we support only one certificate secret name for mvp
-		if len(desired.Spec.CertificateSecretNames) != 0 {
-			certName := desired.Spec.CertificateSecretNames[0]
+		if len(upstreamRequestStruct.Spec.CertificateSecretNames) != 0 {
+			certName := upstreamRequestStruct.Spec.CertificateSecretNames[0]
 			tykCertID, err := r.checkSecretAndUpload(ctx, certName, namespacedName.Namespace, log, &env)
 			if err != nil {
 				return err
@@ -177,26 +200,82 @@ func (r *ApiDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 
 		// Check GraphQL Federation
-		if upstreamRequestStruct.Spec.GraphQL != nil && upstreamRequestStruct.Spec.GraphQL.GraphRef != "" {
+		if upstreamRequestStruct.Spec.GraphQL != nil {
 			if upstreamRequestStruct.Spec.GraphQL.ExecutionMode == model.SubGraphExecutionMode {
 				subgraph := &tykv1alpha1.SubGraph{}
 
-				err := r.Client.Get(ctx, types.NamespacedName{
-					Namespace: req.Namespace,
-					Name:      desired.Spec.GraphQL.GraphRef,
-				}, subgraph)
-				if err != nil {
-					return err
-				}
+				switch upstreamRequestStruct.Spec.GraphQL.GraphRef {
+				case "":
+					// Although ApiDefinition is a subgraph type, its graph reference is removed which means graph_ref field
+					// is empty string.
+					//
+					// If ApiDefinition has previous reference to SubGraph, obtain SubGraph through ApiDefinition's Status
+					// and update SubGraph's status.api_id.
+					if upstreamRequestStruct.Status.SubgraphID != "" {
+						err := r.Client.Get(ctx, types.NamespacedName{
+							Namespace: req.Namespace,
+							Name:      upstreamRequestStruct.Status.SubgraphID,
+						}, subgraph)
+						if err != nil {
+							return err
+						}
 
-				upstreamRequestStruct.Spec.GraphQL.Schema = subgraph.Spec.Schema
-				upstreamRequestStruct.Spec.GraphQL.Subgraph.SDL = subgraph.Spec.SDL
+						subgraph.Status.APIID = ""
+						err = r.Status().Update(ctx, subgraph)
+						if err != nil {
+							log.Error(err, fmt.Sprintf(
+								"Could not update status.api_id of SubGraph %s/%s", subgraph.Namespace, subgraph.Name),
+							)
+							return err
+						}
 
-				subgraph.Status.APIID = upstreamRequestStruct.Spec.APIID
-				err = r.Status().Update(ctx, subgraph)
-				if err != nil {
-					log.Error(err, "Could not update Status APIID of SubGraph")
-					return err
+						upstreamRequestStruct.Status.SubgraphID = ""
+						err = r.Status().Update(ctx, upstreamRequestStruct)
+						if err != nil {
+							log.Error(err, fmt.Sprintf(
+								"Could not update status.subgraph_id of ApiDefinition %s/%s",
+								upstreamRequestStruct.Namespace, upstreamRequestStruct.Name),
+							)
+							return err
+						}
+					}
+				default:
+					err := r.Client.Get(ctx, types.NamespacedName{
+						Namespace: req.Namespace,
+						Name:      upstreamRequestStruct.Spec.GraphQL.GraphRef,
+					}, subgraph)
+					if err != nil {
+						return err
+					}
+
+					// SubGraph can only refer to one ApiDefinition. There is one-to-one relationship between ApiDefinition
+					// and SubGraph. If another ApiDefinition tries to refer same SubGraph, we should return error to
+					// indicate that multiple linking is not allowed.
+					if subgraph.Status.APIID != "" && subgraph.Status.APIID != upstreamRequestStruct.Spec.APIID {
+						return fmt.Errorf("cannot link one SubGraph to multiple ApiDefinition")
+					}
+
+					upstreamRequestStruct.Spec.GraphQL.Schema = subgraph.Spec.Schema
+					upstreamRequestStruct.Spec.GraphQL.Subgraph.SDL = subgraph.Spec.SDL
+
+					upstreamRequestStruct.Status.SubgraphID = subgraph.Name
+					err = r.Status().Update(ctx, upstreamRequestStruct)
+					if err != nil {
+						log.Error(err, fmt.Sprintf(
+							"Could not update status.subgraph_id of ApiDefinition %s/%s",
+							upstreamRequestStruct.Namespace, upstreamRequestStruct.Name),
+						)
+						return err
+					}
+
+					subgraph.Status.APIID = upstreamRequestStruct.Spec.APIID
+					err = r.Status().Update(ctx, subgraph)
+					if err != nil {
+						log.Error(err, fmt.Sprintf(
+							"Could not update status.api_id of SubGraph %s/%s", subgraph.Namespace, subgraph.Name),
+						)
+						return err
+					}
 				}
 			}
 
@@ -268,7 +347,7 @@ func (r *ApiDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		upstreamRequestStruct.Spec.CollectLoopingTarget()
 
 		//  If this is not set, means it is a new object, set it first
-		if desired.Status.ApiID == "" {
+		if upstreamRequestStruct.Status.ApiID == "" {
 			return r.create(ctx, upstreamRequestStruct, log)
 		}
 

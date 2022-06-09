@@ -1962,6 +1962,9 @@ spec:
                   - name
                   type: object
                 type: array
+              subgraph_id:
+                description: SubgraphID corresponds to ID of the Subgraph CRD.
+                type: string
             required:
             - api_id
             type: object

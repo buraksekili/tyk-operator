@@ -45,6 +45,9 @@ type ApiDefinitionStatus struct {
 	// LinkedToAPIs is a list of ApiDefinition namespaced/name that this resource
 	// links to.
 	LinkedToAPIs []model.Target `json:"linked_to_apis,omitempty"`
+
+	// SubgraphID corresponds to ID of the Subgraph CRD.
+	SubgraphID string `json:"subgraph_id,omitempty"`
 }
 
 // +kubebuilder:object:root=true
